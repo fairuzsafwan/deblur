@@ -7,7 +7,8 @@ deblur model for Takeme2space Project
 
 ## Usage
 ### train model
-```python deblur_tf.py -t
+```
+python deblur_tf.py -t
 ```
 
 ### convert model from tensorflow to tensorflow lite
