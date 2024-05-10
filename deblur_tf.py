@@ -211,7 +211,7 @@ if __name__ == "__main__":
     learning_rate = 0.001
     batch_size = 24 #32
     dataset_path = "blur_dataset"
-    model_path = "saved_model2"
+    model_path = "saved_model"
     output_path = "result"
     inference_path = "test_image/6_HUAWEI-MATE20_M.JPG"
     train_loader = None
