@@ -2,8 +2,23 @@
 deblur model for Takeme2space Project
 
 ## Setting up
-- python -m pip install --upgrade pip
-- pip install -r requirements.txt
+1. install [Anaconda](https://www.anaconda.com/download/success)
+2. Run "Anaconda Prompt" terminal and run the following code
+```
+conda create -n "takeme2space" python=3.9.7
+``` 
+3. activate takeme2space enviroment
+```
+conda activate takeme2space
+```
+4. upgrade pip
+```
+python -m pip install --upgrade pip
+```
+5. install required packages
+```
+pip install -r requirements.txt
+```
 
 ## Usage
 ### train model
