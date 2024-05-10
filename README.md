@@ -2,8 +2,8 @@
 deblur model for Takeme2space Project
 
 #Setting up
-python -m pip install --upgrade pip
-pip install -r requirements.txt
+- python -m pip install --upgrade pip
+- pip install -r requirements.txt
 
 #requirements
 - docker
