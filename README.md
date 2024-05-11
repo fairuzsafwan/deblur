@@ -51,3 +51,16 @@ python deblur_tf.py -p train1
 ```
 python deblur_tf.py -t -c -i
 ```
+
+#Development Guide
+
+### Creating new branch
+```
+git branch -n dev-YOURNAME
+```
+
+### Switching to new branch
+```
+git checkout branch dev-YOURNAME
+```
+### Note: Ensure to push to your branch only
