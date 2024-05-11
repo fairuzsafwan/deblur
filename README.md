@@ -63,4 +63,25 @@ git branch -n dev-YOURNAME
 ```
 git checkout branch dev-YOURNAME
 ```
+
+### checking status
+```
+git status
+```
+- to check status of files, red represents files that are modified and not yet pushed
+
+### add files before commiting
+```
+git add fileName1, fileName2, fileName3
+```
+
+### commit files
+```
+git commit -m "any message for reference purposes"
+```
+
+### push files to git repo
+```
+git push -u origin dev-YOURNAME
+```
 ### Note: Ensure to push to your branch only
