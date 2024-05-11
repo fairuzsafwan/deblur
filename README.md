@@ -19,6 +19,8 @@ python -m pip install --upgrade pip
 ```
 pip install -r requirements.txt
 ```
+6. Download [dataset](https://sotonac-my.sharepoint.com/:u:/g/personal/fsm1d23_soton_ac_uk/EebAPMYDCwhJkJ68o4sOkZsB4SBphhcKtKhxaldugsDlnA?e=OiFmP0)
+
 
 ## Usage
 ### train model
