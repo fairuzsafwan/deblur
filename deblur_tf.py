@@ -113,21 +113,21 @@ class UNet(tf.keras.Model):
         results = self.outc(x)
         return results
 
-def read_image(image_path):
+def read_image(image_path, img_size=(512, 512)):
     img = cv2.imread(image_path, cv2.IMREAD_COLOR)
-    img = cv2.resize(img, (256, 256))  # Resize images to a fixed size
+    img = cv2.resize(img, img_size)  # Resize images to a fixed size
     img = img / 255.0  # Normalize the images
     return img
 
-def read_inference_image(image_path):
+def read_inference_image(image_path, img_size=(512, 512)):
     img = cv2.imread(image_path, cv2.IMREAD_COLOR)
-    img = cv2.resize(img, (256, 256))  # Resize images to match training input size
+    img = cv2.resize(img, img_size)  # Resize images to match training input size
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
     img = img.astype(np.float32) / 255.0  # Normalize the images
     return img
 
-def processDataset(dataset_path, batch_size):
-    train_dataset = CustomDataset(image_path_folder=dataset_path, batch_size=batch_size)
+def processDataset(dataset_path, batch_size, input_shape):
+    train_dataset = CustomDataset(image_path_folder=dataset_path, batch_size=batch_size, input_shape)
     return train_dataset
 
 def trainModel(num_epochs=10, learning_rate=0.001, train_loader=None, model_path="./"):
@@ -174,12 +174,12 @@ def convertModel(model_path):
         f.write(tflite_model)
     print("------------- Conversion completed -------------")
 
-def inference(model_path, img_path, output_path):
+def inference(model_path, img_path, output_path, img_size):
     print("------------- Inference start -------------")
     # Load the trained model
     model = tf.keras.models.load_model(model_path)
 
-    img_infer = read_inference_image(img_path)
+    img_infer = read_inference_image(img_path, img_size)
     infer_input = np.expand_dims(img_infer, axis=0)  # Add batch dimension
     output_image = model.predict(infer_input)
     
@@ -207,14 +207,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # parameters
-    num_epochs = 10
+    num_epochs = 3
     learning_rate = 0.001
-    batch_size = 24 #32
+    batch_size = 18 #32
     dataset_path = "blur_dataset"
     model_path = "saved_model"
     output_path = "result"
-    inference_path = "test_image/6_HUAWEI-MATE20_M.JPG"
+    inference_path = "test_image/7_NIKON-D3400-35MM_M.JPG" #7_NIKON-D3400-35MM_M #6_HUAWEI-MATE20_M.JPG
     train_loader = None
+    img_size = (512, 512) #(256, 256)
     
     #Create directory to save model
     if args.path:
@@ -228,7 +229,7 @@ if __name__ == "__main__":
     # train model
     if args.train:     
         #process dataset
-        train_loader = processDataset(dataset_path, batch_size)
+        train_loader = processDataset(dataset_path, batch_size, img_size)
 
         # Train model
         trainModel(num_epochs, learning_rate, train_loader, model_path)
@@ -237,4 +238,4 @@ if __name__ == "__main__":
         convertModel(model_path)
 
     if args.infer:
-        inference(model_path, inference_path, output_path)
+        inference(model_path, inference_path, output_path, img_size)
