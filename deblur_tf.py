@@ -31,8 +31,8 @@ class CustomDataset(tf.keras.utils.Sequence):
             train_image_path = os.path.join(self.image_root_path, "motion_blurred", img_train)
             gt_image_path = os.path.join(self.image_root_path, "sharp", img_gt)
 
-            train_image = read_image(train_image_path)
-            gt_image = read_image(gt_image_path)
+            train_image = read_image(train_image_path, img_size=self.input_shape)
+            gt_image = read_image(gt_image_path, img_size=self.input_shape)
 
             # cv2.imshow("Train", train_image)
             # cv2.imshow("GT", gt_image)
@@ -127,7 +127,7 @@ def read_inference_image(image_path, img_size=(512, 512)):
     return img
 
 def processDataset(dataset_path, batch_size, input_shape):
-    train_dataset = CustomDataset(image_path_folder=dataset_path, batch_size=batch_size, input_shape)
+    train_dataset = CustomDataset(image_path_folder=dataset_path, batch_size=batch_size, input_shape=input_shape)
     return train_dataset
 
 def trainModel(num_epochs=10, learning_rate=0.001, train_loader=None, model_path="./"):
@@ -179,7 +179,7 @@ def inference(model_path, img_path, output_path, img_size):
     # Load the trained model
     model = tf.keras.models.load_model(model_path)
 
-    img_infer = read_inference_image(img_path, img_size)
+    img_infer = read_inference_image(img_path, img_size=img_size)
     infer_input = np.expand_dims(img_infer, axis=0)  # Add batch dimension
     output_image = model.predict(infer_input)
     
@@ -207,9 +207,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # parameters
-    num_epochs = 3
+    num_epochs = 10
     learning_rate = 0.001
-    batch_size = 18 #32
+    batch_size = 24 #32
     dataset_path = "blur_dataset"
     model_path = "saved_model"
     output_path = "result"
