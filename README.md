@@ -56,7 +56,7 @@ python deblur_tf.py -t -c -i
 
 ### Creating new branch
 ```
-git branch -n dev-YOURNAME
+git branch dev-YOURNAME
 ```
 
 ### Switching to new branch
