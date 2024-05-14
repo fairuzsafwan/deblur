@@ -124,6 +124,10 @@ def read_inference_image(image_path):
     img = cv2.resize(img, (256, 256))  # Resize images to match training input size
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
     img = img.astype(np.float32) / 255.0  # Normalize the images
+
+    if img is None:
+        print("Error: Unable to load the image.")
+
     return img
 
 def processDataset(dataset_path, batch_size):
@@ -207,13 +211,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # parameters
-    num_epochs = 10
-    learning_rate = 0.001
+    num_epochs = 50
+    learning_rate = 0.005
     batch_size = 24 #32
     dataset_path = "blur_dataset"
     model_path = "saved_model"
     output_path = "result"
-    inference_path = "test_image/6_HUAWEI-MATE20_M.JPG"
+    inference_path = "test_image/12_SAMSUNG-GALAXY-J5_F.JPG"
     train_loader = None
     
     #Create directory to save model
