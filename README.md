@@ -2,12 +2,14 @@
 deblur model for Takeme2space Project
 
 ## Setting up
+
+### METHOD 1
 1. install [Anaconda](https://www.anaconda.com/download/success)
 2. Run "Anaconda Prompt" terminal and run the following code
 ```
 conda create -n "takeme2space" python=3.9.7
 ``` 
-3. activate takeme2space enviroment
+3. activate takeme2space environment
 ```
 conda activate takeme2space
 ```
@@ -21,6 +23,17 @@ pip install -r requirements.txt
 ```
 6. Download and unzip [dataset](https://sotonac-my.sharepoint.com/:u:/g/personal/fsm1d23_soton_ac_uk/EebAPMYDCwhJkJ68o4sOkZsB4SBphhcKtKhxaldugsDlnA?e=OiFmP0)
 
+OR Alternatively
+
+### METHOD 2
+1. create environment using environment file
+```
+conda env create -f env.yml
+```
+2. activate pytorch environment
+```
+conda activate pytorch
+```
 
 ## Usage
 ### train model
