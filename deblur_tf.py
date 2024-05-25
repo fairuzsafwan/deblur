@@ -116,14 +116,16 @@ class UNet(tf.keras.Model):
 def read_image(image_path, img_size=(512, 512)):
     img = cv2.imread(image_path, cv2.IMREAD_COLOR)
     img = cv2.resize(img, img_size)  # Resize images to a fixed size
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
     img = img / 255.0  # Normalize the images
     return img
 
-def read_inference_image(image_path, img_size=(512, 512)):
+def read_inference_image(image_path, img_size=(512, 512), normalize = False):
     img = cv2.imread(image_path, cv2.IMREAD_COLOR)
     img = cv2.resize(img, img_size)  # Resize images to match training input size
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
-    img = img.astype(np.float32) / 255.0  # Normalize the images
+    if normalize:
+        img = img.astype(np.float32) / 255.0  # Normalize the images
     return img
 
 def processDataset(dataset_path, batch_size, input_shape):
@@ -154,12 +156,13 @@ def trainModel(num_epochs=10, learning_rate=0.001, train_loader=None, model_path
             total_loss += loss
 
         print(f'Epoch [{epoch + 1}/{num_epochs}], Loss: {total_loss}')
+
+        #model.save_weights(model_path_name)
+        model.save(os.path.join(model_path, str(epoch+1)))
     
     end_t = time.time() - start_t
     print(f"Time: {int(end_t // 60)} mins {int(end_t % 60)} secs")
 
-    #model.save_weights(model_path_name)
-    model.save(model_path)
     print("------------- Training completed -------------")
 
 def convertModel(model_path):
@@ -170,16 +173,18 @@ def convertModel(model_path):
     tflite_model = converter.convert()
 
     # Save the TensorFlow Lite model
-    with open(os.path.join(model_path, model_path) + ".tflite", "wb") as f:
+    with open(os.path.join(model_path, os.path.basename(model_path)) + ".tflite", "wb") as f:
         f.write(tflite_model)
     print("------------- Conversion completed -------------")
 
-def inference(model_path, img_path, output_path, img_size):
+def inference(model_path, img_path, output_path, resized_original_imgpath, img_size):
     print("------------- Inference start -------------")
     # Load the trained model
     model = tf.keras.models.load_model(model_path)
 
-    img_infer = read_inference_image(img_path, img_size=img_size)
+    ori_img = read_inference_image(img_path, img_size=img_size, normalize=False)
+
+    img_infer = read_inference_image(img_path, img_size=img_size, normalize=True)
     infer_input = np.expand_dims(img_infer, axis=0)  # Add batch dimension
     output_image = model.predict(infer_input)
     
@@ -191,10 +196,16 @@ def inference(model_path, img_path, output_path, img_size):
     output_image = cv2.cvtColor(output_image, cv2.COLOR_RGB2BGR)
     output_image_path = os.path.join(output_path, os.path.basename(img_path))
 
+    resized_ori_imgPath = os.path.join(resized_original_imgpath, os.path.basename(img_path))
+
     if not os.path.exists(output_path):
         os.makedirs(output_path)
+    
+    if not os.path.exists(resized_original_imgpath):
+        os.makedirs(resized_original_imgpath)
 
     cv2.imwrite(output_image_path, output_image)
+    cv2.imwrite(resized_ori_imgPath, ori_img)
     print(f"Output image saved at {output_image_path}")
     print("------------- Inference completed -------------")
 
@@ -209,13 +220,14 @@ if __name__ == "__main__":
     # parameters
     num_epochs = 10
     learning_rate = 0.001
-    batch_size = 24 #32
+    batch_size = 18 #32
     dataset_path = "blur_dataset"
     model_path = "saved_model"
     output_path = "result"
-    inference_path = "test_image/7_NIKON-D3400-35MM_M.JPG" #7_NIKON-D3400-35MM_M #6_HUAWEI-MATE20_M.JPG
+    inference_path = "test_image/6_HUAWEI-MATE20_M.JPG" #7_NIKON-D3400-35MM_M #6_HUAWEI-MATE20_M.JPG #13_IPHONE-8-PLUS_M #6_HUAWEI-MATE20_M #13_IPHONE-8-PLUS_M
+    resized_original_imgpath = "resized_test_image"
     train_loader = None
-    img_size = (512, 512) #(256, 256)
+    img_size = (224, 224) #(256, 256) #(512, 512)
     
     #Create directory to save model
     if args.path:
@@ -223,6 +235,7 @@ if __name__ == "__main__":
     
     if not os.path.exists(model_path):
         os.makedirs(model_path)
+
 
     print("Model Path: ", model_path)
 
@@ -238,4 +251,4 @@ if __name__ == "__main__":
         convertModel(model_path)
 
     if args.infer:
-        inference(model_path, inference_path, output_path, img_size)
+        inference(model_path, inference_path, output_path, resized_original_imgpath, img_size)
