@@ -7,6 +7,8 @@ from PIL import Image
 import time
 import argparse
 
+import model as mdl
+
 # Define a custom dataset class
 class CustomDataset(tf.keras.utils.Sequence):
     def __init__(self, image_path_folder, batch_size=32, input_shape=(256, 256), shuffle=True):
@@ -15,7 +17,7 @@ class CustomDataset(tf.keras.utils.Sequence):
         self.input_shape = input_shape
         self.shuffle = shuffle
         self.image_gt = os.listdir(os.path.join(image_path_folder, "sharp"))
-        self.image_train = os.listdir(os.path.join(image_path_folder, "motion_blurred"))
+        self.image_train = os.listdir(os.path.join(image_path_folder, "motion_blurred_v2"))
 
     def __len__(self):
         return int(np.ceil(len(self.image_train) / float(self.batch_size)))
@@ -28,7 +30,7 @@ class CustomDataset(tf.keras.utils.Sequence):
         gt_images = []
 
         for img_train, img_gt in zip(batch_image_train, batch_image_gt):
-            train_image_path = os.path.join(self.image_root_path, "motion_blurred", img_train)
+            train_image_path = os.path.join(self.image_root_path, "motion_blurred_v2", img_train)
             gt_image_path = os.path.join(self.image_root_path, "sharp", img_gt)
 
             train_image = read_image(train_image_path, img_size=self.input_shape)
@@ -123,8 +125,8 @@ def read_image(image_path, img_size=(512, 512)):
 def read_inference_image(image_path, img_size=(512, 512), normalize = False):
     img = cv2.imread(image_path, cv2.IMREAD_COLOR)
     img = cv2.resize(img, img_size)  # Resize images to match training input size
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
     if normalize:
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
         img = img.astype(np.float32) / 255.0  # Normalize the images
     return img
 
@@ -135,6 +137,7 @@ def processDataset(dataset_path, batch_size, input_shape):
 def trainModel(num_epochs=10, learning_rate=0.001, train_loader=None, model_path="./"):
     print("------------- Training Start -------------")
     model = UNet(n_channels=3, n_classes=3)
+    # model = mdl.FPN(n_channels=3, n_classes=3)
     optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
     criterion = tf.keras.losses.MeanSquaredError()
 
@@ -181,32 +184,34 @@ def inference(model_path, img_path, output_path, resized_original_imgpath, img_s
     print("------------- Inference start -------------")
     # Load the trained model
     model = tf.keras.models.load_model(model_path)
+    img_paths = [os.path.join(img_path, path) for path in os.listdir(img_path)]
 
-    ori_img = read_inference_image(img_path, img_size=img_size, normalize=False)
+    for img_path in img_paths:
+        ori_img = read_inference_image(img_path, img_size=img_size, normalize=False)
 
-    img_infer = read_inference_image(img_path, img_size=img_size, normalize=True)
-    infer_input = np.expand_dims(img_infer, axis=0)  # Add batch dimension
-    output_image = model.predict(infer_input)
-    
-    # Denormalize the output image
-    output_image = output_image.squeeze() * 255.0  
+        img_infer = read_inference_image(img_path, img_size=img_size, normalize=True)
+        infer_input = np.expand_dims(img_infer, axis=0)  # Add batch dimension
+        output_image = model.predict(infer_input)
+        
+        # Denormalize the output image
+        output_image = output_image.squeeze() * 255.0  
 
-    # Clip and convert image to uint8
-    output_image = np.clip(output_image, 0, 255).astype(np.uint8)
-    output_image = cv2.cvtColor(output_image, cv2.COLOR_RGB2BGR)
-    output_image_path = os.path.join(output_path, os.path.basename(img_path))
+        # Clip and convert image to uint8
+        output_image = np.clip(output_image, 0, 255).astype(np.uint8)
+        output_image = cv2.cvtColor(output_image, cv2.COLOR_RGB2BGR)
+        output_image_path = os.path.join(output_path, os.path.basename(img_path))
 
-    resized_ori_imgPath = os.path.join(resized_original_imgpath, os.path.basename(img_path))
+        resized_ori_imgPath = os.path.join(resized_original_imgpath, os.path.basename(img_path))
 
-    if not os.path.exists(output_path):
-        os.makedirs(output_path)
-    
-    if not os.path.exists(resized_original_imgpath):
-        os.makedirs(resized_original_imgpath)
+        if not os.path.exists(output_path):
+            os.makedirs(output_path)
+        
+        if not os.path.exists(resized_original_imgpath):
+            os.makedirs(resized_original_imgpath)
 
-    cv2.imwrite(output_image_path, output_image)
-    cv2.imwrite(resized_ori_imgPath, ori_img)
-    print(f"Output image saved at {output_image_path}")
+        cv2.imwrite(output_image_path, output_image)
+        cv2.imwrite(resized_ori_imgPath, ori_img)
+        print(f"Output image saved at {output_image_path}")
     print("------------- Inference completed -------------")
 
 if __name__ == "__main__":
@@ -218,16 +223,16 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # parameters
-    num_epochs = 10
+    num_epochs = 60
     learning_rate = 0.001
-    batch_size = 18 #32
+    batch_size = 8 #32
     dataset_path = "blur_dataset"
     model_path = "saved_model"
     output_path = "result"
-    inference_path = "test_image/6_HUAWEI-MATE20_M.JPG" #7_NIKON-D3400-35MM_M #6_HUAWEI-MATE20_M.JPG #13_IPHONE-8-PLUS_M #6_HUAWEI-MATE20_M #13_IPHONE-8-PLUS_M
+    inference_path = "test_image" #6_HUAWEI-MATE20_M.JPG #7_NIKON-D3400-35MM_M #6_HUAWEI-MATE20_M.JPG #13_IPHONE-8-PLUS_M #6_HUAWEI-MATE20_M #13_IPHONE-8-PLUS_M
     resized_original_imgpath = "resized_test_image"
     train_loader = None
-    img_size = (224, 224) #(256, 256) #(512, 512)
+    img_size = (256, 256) #(256, 256) #(512, 512) (224,224)
     
     #Create directory to save model
     if args.path:
