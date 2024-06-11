@@ -7,6 +7,8 @@ from PIL import Image
 import time
 import argparse
 
+import model as mdl
+
 # Define a custom dataset class
 class CustomDataset(tf.keras.utils.Sequence):
     def __init__(self, image_path_folder, batch_size=32, input_shape=(256, 256), shuffle=True):
@@ -15,7 +17,7 @@ class CustomDataset(tf.keras.utils.Sequence):
         self.input_shape = input_shape
         self.shuffle = shuffle
         self.image_gt = os.listdir(os.path.join(image_path_folder, "sharp"))
-        self.image_train = os.listdir(os.path.join(image_path_folder, "motion_blurred"))
+        self.image_train = os.listdir(os.path.join(image_path_folder, "motion_blurred_v2"))
 
     def __len__(self):
         return int(np.ceil(len(self.image_train) / float(self.batch_size)))
@@ -28,11 +30,11 @@ class CustomDataset(tf.keras.utils.Sequence):
         gt_images = []
 
         for img_train, img_gt in zip(batch_image_train, batch_image_gt):
-            train_image_path = os.path.join(self.image_root_path, "motion_blurred", img_train)
+            train_image_path = os.path.join(self.image_root_path, "motion_blurred_v2", img_train)
             gt_image_path = os.path.join(self.image_root_path, "sharp", img_gt)
 
-            train_image = read_image(train_image_path)
-            gt_image = read_image(gt_image_path)
+            train_image = read_image(train_image_path, img_size=self.input_shape)
+            gt_image = read_image(gt_image_path, img_size=self.input_shape)
 
             # cv2.imshow("Train", train_image)
             # cv2.imshow("GT", gt_image)
@@ -113,30 +115,38 @@ class UNet(tf.keras.Model):
         results = self.outc(x)
         return results
 
-def read_image(image_path):
+def read_image(image_path, img_size=(512, 512)):
     img = cv2.imread(image_path, cv2.IMREAD_COLOR)
-    img = cv2.resize(img, (256, 256))  # Resize images to a fixed size
+    img = cv2.resize(img, img_size)  # Resize images to a fixed size
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
     img = img / 255.0  # Normalize the images
     return img
 
-def read_inference_image(image_path):
-    img = cv2.imread(image_path, cv2.IMREAD_COLOR)
-    img = cv2.resize(img, (256, 256))  # Resize images to match training input size
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
-    img = img.astype(np.float32) / 255.0  # Normalize the images
+def read_inference_image(image_path, img_size=(512, 512), normalize=False):
+    try:
+        img = cv2.imread(image_path, cv2.IMREAD_COLOR)
+        if img is None:
+            raise ValueError(f"Error: Failed to load image at {image_path}")
+        
+        img = cv2.resize(img, img_size)  # Resize images to match training input size
+        
+        if normalize:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
+            img = img.astype(np.float32) / 255.0  # Normalize the images
 
-    if img is None:
-        print("Error: Unable to load the image.")
+        return img
+    except Exception as e:
+        print(f"Exception in reading image {image_path}: {e}")
+        return None
 
-    return img
-
-def processDataset(dataset_path, batch_size):
-    train_dataset = CustomDataset(image_path_folder=dataset_path, batch_size=batch_size)
+def processDataset(dataset_path, batch_size, input_shape):
+    train_dataset = CustomDataset(image_path_folder=dataset_path, batch_size=batch_size, input_shape=input_shape)
     return train_dataset
 
 def trainModel(num_epochs=10, learning_rate=0.001, train_loader=None, model_path="./"):
     print("------------- Training Start -------------")
     model = UNet(n_channels=3, n_classes=3)
+    # model = mdl.FPN(n_channels=3, n_classes=3)
     optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
     criterion = tf.keras.losses.MeanSquaredError()
 
@@ -158,12 +168,16 @@ def trainModel(num_epochs=10, learning_rate=0.001, train_loader=None, model_path
             total_loss += loss
 
         print(f'Epoch [{epoch + 1}/{num_epochs}], Loss: {total_loss}')
+
+        #model.save_weights(model_path_name)
+        model.save(os.path.join(model_path, str(epoch+1)))
+
+        #Clears sessions for memory leak issues
+        tf.keras.backend.clear_session()
     
     end_t = time.time() - start_t
     print(f"Time: {int(end_t // 60)} mins {int(end_t % 60)} secs")
 
-    #model.save_weights(model_path_name)
-    model.save(model_path)
     print("------------- Training completed -------------")
 
 def convertModel(model_path):
@@ -174,35 +188,74 @@ def convertModel(model_path):
     tflite_model = converter.convert()
 
     # Save the TensorFlow Lite model
-    with open(os.path.join(model_path, model_path) + ".tflite", "wb") as f:
+    with open(os.path.join(model_path, os.path.basename(model_path)) + ".tflite", "wb") as f:
         f.write(tflite_model)
     print("------------- Conversion completed -------------")
 
-def inference(model_path, img_path, output_path):
+def inference(model_path, img_path, output_path, resized_original_imgpath, img_size):
     print("------------- Inference start -------------")
-    # Load the trained model
-    model = tf.keras.models.load_model(model_path)
-
-    img_infer = read_inference_image(img_path)
-    infer_input = np.expand_dims(img_infer, axis=0)  # Add batch dimension
-    output_image = model.predict(infer_input)
     
-    # Denormalize the output image
-    output_image = output_image.squeeze() * 255.0  
+    try:
+        # Load the trained model
+        model = tf.keras.models.load_model(model_path)
+    except Exception as e:
+        print(f"Error loading model from {model_path}: {e}")
+        return
 
-    # Clip and convert image to uint8
-    output_image = np.clip(output_image, 0, 255).astype(np.uint8)
-    output_image = cv2.cvtColor(output_image, cv2.COLOR_RGB2BGR)
-    output_image_path = os.path.join(output_path, os.path.basename(img_path))
+    dirName_path = os.path.dirname(model_path)
+    baseName_path = os.path.basename(model_path)
+    dirName_path = dirName_path + "_" + baseName_path
+    output_path = os.path.join(output_path, dirName_path)
+    img_paths = [os.path.join(img_path, path) for path in os.listdir(img_path)]
 
     if not os.path.exists(output_path):
         os.makedirs(output_path)
+        
+    if not os.path.exists(resized_original_imgpath):
+        os.makedirs(resized_original_imgpath)
 
-    cv2.imwrite(output_image_path, output_image)
-    print(f"Output image saved at {output_image_path}")
+    for img_path in img_paths:
+        try:
+            ori_img = read_inference_image(img_path, img_size=img_size, normalize=False)
+        except ValueError as e:
+            print(e)
+            continue
+
+        try:
+            img_infer = read_inference_image(img_path, img_size=img_size, normalize=True)
+        except ValueError as e:
+            print(e)
+            continue
+
+        try:
+            infer_input = np.expand_dims(img_infer, axis=0)  # Add batch dimension
+            output_image = model.predict(infer_input)
+        except Exception as e:
+            print(f"Error predicting image {img_path}: {e}")
+            continue
+        
+        # Denormalize the output image
+        output_image = output_image.squeeze() * 255.0  
+
+        # Clip and convert image to uint8
+        output_image = np.clip(output_image, 0, 255).astype(np.uint8)
+        output_image = cv2.cvtColor(output_image, cv2.COLOR_RGB2BGR)
+        
+        output_image_path = os.path.join(output_path, os.path.basename(img_path))
+        resized_ori_imgPath = os.path.join(resized_original_imgpath, os.path.basename(img_path))
+
+        try:
+            cv2.imwrite(output_image_path, output_image)
+            cv2.imwrite(resized_ori_imgPath, ori_img)
+            print(f"Output image saved at {output_image_path}")
+        except Exception as e:
+            print(f"Error saving image {img_path}: {e}")
+
     print("------------- Inference completed -------------")
 
 if __name__ == "__main__":
+    tf.keras.backend.clear_session()
+
     parser = argparse.ArgumentParser(description="Train deblurring model | Convert model to Tensorflow Lite")
     parser.add_argument("--train", "-t", action="store_true", help="train deblurring model")
     parser.add_argument("--infer", "-i", action="store_true", help="inference")
@@ -211,14 +264,16 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # parameters
-    num_epochs = 50
-    learning_rate = 0.005
-    batch_size = 24 #32
+    num_epochs = 200
+    learning_rate = 0.001
+    batch_size = 18 #32
     dataset_path = "blur_dataset"
-    model_path = "saved_model"
+    model_path = "256_e200_unet_b18_tf/200"
     output_path = "result"
-    inference_path = "test_image/12_SAMSUNG-GALAXY-J5_F.JPG"
+    inference_path = "test_image"
+    resized_original_imgpath = "resized_test_image"
     train_loader = None
+    img_size = (256, 256) #(256, 256) #(512, 512) (224,224)
     
     #Create directory to save model
     if args.path:
@@ -227,12 +282,13 @@ if __name__ == "__main__":
     if not os.path.exists(model_path):
         os.makedirs(model_path)
 
+
     print("Model Path: ", model_path)
 
     # train model
     if args.train:     
         #process dataset
-        train_loader = processDataset(dataset_path, batch_size)
+        train_loader = processDataset(dataset_path, batch_size, img_size)
 
         # Train model
         trainModel(num_epochs, learning_rate, train_loader, model_path)
@@ -241,4 +297,4 @@ if __name__ == "__main__":
         convertModel(model_path)
 
     if args.infer:
-        inference(model_path, inference_path, output_path)
+        inference(model_path, inference_path, output_path, resized_original_imgpath, img_size)

@@ -2,12 +2,14 @@
 deblur model for Takeme2space Project
 
 ## Setting up
+
+### METHOD 1
 1. install [Anaconda](https://www.anaconda.com/download/success)
 2. Run "Anaconda Prompt" terminal and run the following code
 ```
 conda create -n "takeme2space" python=3.9.7
 ``` 
-3. activate takeme2space enviroment
+3. activate takeme2space environment
 ```
 conda activate takeme2space
 ```
@@ -19,8 +21,19 @@ python -m pip install --upgrade pip
 ```
 pip install -r requirements.txt
 ```
-6. Download [dataset](https://sotonac-my.sharepoint.com/:u:/g/personal/fsm1d23_soton_ac_uk/EebAPMYDCwhJkJ68o4sOkZsB4SBphhcKtKhxaldugsDlnA?e=OiFmP0)
+6. Download and unzip [dataset](https://sotonac-my.sharepoint.com/:u:/g/personal/fsm1d23_soton_ac_uk/EebAPMYDCwhJkJ68o4sOkZsB4SBphhcKtKhxaldugsDlnA?e=OiFmP0)
 
+OR Alternatively
+
+### METHOD 2
+1. create environment using environment file
+```
+conda env create -f env.yml
+```
+2. activate pytorch environment
+```
+conda activate pytorch
+```
 
 ## Usage
 ### train model
@@ -37,14 +50,14 @@ python deblur_tf.py -c
 ```
 python deblur_tf.py -i
 ```
-   * ensure to store blurry images in "test_image" folder
+   * store blurry images in "test_image" folder
    * results will be saved in "result" folder
 
 ### Change path to save model
 ```
 python deblur_tf.py -p train1
 ```
-   * this example will saved the models to a folder called "train1"
+   * this example will save the models to a folder called "train1"
    * if the flag -p is not used, the default folder is saved_model
 
 ### Train --> Convert --> inference
