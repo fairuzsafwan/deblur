@@ -90,18 +90,20 @@ if __name__ == "__main__":
 
         # Access the lux value
         lux_value = obc_data.al_lux
+        print(f"Received lux value: {lux_value}")
 
-        # Capture frame from the camera
-        ret, frame = cap.read()
 
-        # Check if lux value is within range
-        if lux_min <= lux_value <= lux_max:
-            # Perform inference
-            inference(model_path, frame, "output_path", (256, 256), index)
-            index += 1  # Increment index
+        # # Capture frame from the camera
+        # ret, frame = cap.read()
 
-        # Sleep for a short duration to avoid high CPU usage
-        time.sleep(0.1)
+        # # Check if lux value is within range
+        # if lux_min <= lux_value <= lux_max:
+        #     # Perform inference
+        #     inference(model_path, frame, "output_path", (256, 256), index)
+        #     index += 1  # Increment index
+
+        # # Sleep for a short duration to avoid high CPU usage
+        # time.sleep(0.1)
 
     # Release the camera capture object after the loop ends
     cap.release()
