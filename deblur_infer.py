@@ -112,6 +112,7 @@ if __name__ == "__main__":
 
         # Access the lux value
         lux_value = obc_data.al_lux
+
         print(f"Value obtained: {lux_value}")
 
         # Perform inference or other processing as needed based on lux_value
