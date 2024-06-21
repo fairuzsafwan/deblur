@@ -3,42 +3,34 @@ import cv2
 import numpy as np
 import time
 import os
+import struct
 import tensorflow as tf
+import json
 
 # Define a class to deserialize data received via ZeroMQ
 class OBC_TlmData:
     def __init__(self, data):
-        # Unpack the received data into attributes based on the defined format
+        unpack_format = 'b'*4 + 'H'*2 + 'h'*2 + 'f' + 'i'*4 + 'f'*13 + 'Ii' + 'b'*2 + 'H'*3 + 'I'
+        expected_size = struct.calcsize(unpack_format)
+        
+        if len(data) != expected_size:
+            print(f"Received data size: {len(data)}, expected: {expected_size}")
+            raise ValueError(f"Expected data of size {expected_size} bytes, but received {len(data)} bytes.")
+        
         (
             self.active_sensor_count, self.mission_mode, self.voltage_5v, self.voltage_3v,
             self.current_5v, self.current_3v, self.pi_temperature, self.board_temperature,
-            self.uv_temperature, self.uv_a, self.uv_b, self.uv_c,
+            self.al_lux,
+            self.red_lux, self.green_lux, self.blue_lux, self.ir_lux,
             self.mag_uT_x, self.mag_uT_y, self.mag_uT_z,
             self.gyro_dps_x, self.gyro_dps_y, self.gyro_dps_z,
             self.accel_ms2_x, self.accel_ms2_y, self.accel_ms2_z,
-            self.gravity_x, self.gravity_y, self.gravity_z,
-            self.quater_w, self.quater_x, self.quater_y, self.quater_z,
-            self.al_lux,
-            self.red_lux, self.green_lux, self.blue_lux, self.ir_lux,
+            self.uv_a, self.uv_b, self.uv_c, self.uv_temp,
             self.ss_lux, self.ss_temperature,
+            self.sc_voltage, self.padding, self.sc_ckt_resistance,
+            self.sc_current, self.sc_power,
             self.timeepoch
-        ) = struct.unpack('bbbbHHhhHHHfff' + 'fff' * 3 + 'fiiiiII', data)
-
-# Set up ZeroMQ subscriber socket
-context = zmq.Context()
-subscriber = context.socket(zmq.SUB)
-subscriber.connect("ipc:///tmp/obc_ss")
-
-# Set subscription filter to empty string (receive all messages)
-subscriber.setsockopt_string(zmq.SUBSCRIBE, "")
-
-# Lux range for filtering
-lux_min = 10  # Define minimum lux threshold
-lux_max = 100000  # Define maximum lux threshold
-
-# Load inference model (assuming we have already trained the model)
-model_path = "saved_model"
-model = tf.keras.models.load_model(model_path)
+        ) = struct.unpack(unpack_format, data)
 
 # Function to read and preprocess images for inference
 def read_inference_image(image):
@@ -47,61 +39,88 @@ def read_inference_image(image):
     return img
 
 # Function to perform inference on a single image
-def inference(model_path, img, output_path, img_size, index):
-    print("------------- Inference start -------------")
-    # Load the trained model
-    model = tf.keras.models.load_model(model_path)
-
+def inference(interpreter, img, output_path, img_size, index):
     # Preprocess the input image
     img_infer = read_inference_image(img)
-    infer_input = np.expand_dims(img_infer, axis=0)  # Add batch dimension
+    img_infer_resized = cv2.resize(img_infer, (input_details[0]['shape'][1], input_details[0]['shape'][2]))
+    img_infer_expanded = np.expand_dims(img_infer_resized, axis=0)  # Add batch dimension
+
+    # Set the input tensor
+    interpreter.set_tensor(input_details[0]['index'], img_infer_expanded)
 
     # Perform inference
-    output_image = model.predict(infer_input)
-    
-    # Denormalize the output image
-    output_image = output_image.squeeze() * 255.0  
+    interpreter.invoke()
 
-    # Clip and convert image to uint8
-    output_image = np.clip(output_image, 0, 255).astype(np.uint8)
+    # Get the output tensor
+    output_tensor = interpreter.get_tensor(output_details[0]['index'])
+
+    # Post-process the output tensor if needed
+    # For example, convert to RGB and save the image
+    output_image = np.squeeze(output_tensor)  # Assuming single output tensor
+    output_image = (output_image * 255).astype(np.uint8)
     output_image = cv2.cvtColor(output_image, cv2.COLOR_RGB2BGR)
-    
+
+    # Create output directory if it does not exist
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+
     # Save the output image with index
     output_image_path = os.path.join(output_path, f"inference_result_{index}.jpg")
     cv2.imwrite(output_image_path, output_image)
 
-    # # Print confirmation message
-    # print(f"Inference result {index} saved at {output_image_path}")
-    # print("------------- Inference completed -------------")
+    print(f"Inference result {index} saved at {output_image_path}")
 
 if __name__ == "__main__":
-    # Start ZeroMQ loop for inference
+    # Load configuration from JSON file
+    with open('config.json', 'r') as config_file:
+        config = json.load(config_file)
+    
+    # Read configuration values
+    ipc_address = config["ZeroMQ"]["ipc_address"]
+    lux_min = config["LUX"]["lux_min"]
+    lux_max = config["LUX"]["lux_max"]
+    model_path = config["Model"]["model_path"]
+    output_path = config["Inference"]["output_path"]
+    img_size = config["Inference"]["img_size"]
 
-    # Initialize VideoCapture outside of the loop
-    cap = cv2.VideoCapture(0)  # Use 0 for the default camera
+    # Set up ZeroMQ subscriber socket
+    context = zmq.Context()
+    subscriber = context.socket(zmq.SUB)
+    subscriber.connect(ipc_address)
+
+    # Set subscription filter to empty string (receive all messages)
+    subscriber.setsockopt_string(zmq.SUBSCRIBE, "")
+
+    # Load the TensorFlow Lite model
+    interpreter = tf.lite.Interpreter(model_path=model_path)
+    interpreter.allocate_tensors()
+
+    input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
+
     index = 0
-
     while True:
         # Receive message from ZeroMQ
         message = subscriber.recv()
 
-        # Deserialize the received data into OBC_TlmData object
-        obc_data = OBC_TlmData(message)
+        try:
+            # Deserialize the received data into OBC_TlmData object
+            obc_data = OBC_TlmData(message)
+        except ValueError as e:
+            print(f"Error: {e}")
+            continue  # Skip processing this message
 
         # Access the lux value
         lux_value = obc_data.al_lux
+        print(f"Value obtained: {lux_value}")
 
-        # Capture frame from the camera
-        ret, frame = cap.read()
+        # Perform inference or other processing as needed based on lux_value
+        # For example, if lux_value is within a certain range, trigger inference
+        #if lux_min <= lux_value <= lux_max:
+        #    # Assume `img` is available for inference, you would need to load the actual image
+        #    img = np.zeros((img_size, img_size, 3), dtype=np.uint8)  # Placeholder for the actual image
+        #    inference(interpreter, img, output_path, img_size, index)
+        #    index += 1
 
-        # Check if lux value is within range
-        if lux_min <= lux_value <= lux_max:
-            # Perform inference
-            inference(model_path, frame, "output_path", (256, 256), index)
-            index += 1  # Increment index
-
-        # Sleep for a short duration to avoid high CPU usage
         time.sleep(0.1)
 
-    # Release the camera capture object after the loop ends
-    cap.release()

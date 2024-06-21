@@ -1,0 +1,17 @@
+{
+    "ZeroMQ": {
+        "ipc_address": "ipc:///tmp/obc_ss"
+    },
+    "LUX": {
+        "lux_min": 10,
+        "lux_max": 100000
+    },
+    "Model": {
+        "model_path": "256_e200_unet_b18_tf/200/200.tflite"
+    },
+    "Inference": {
+        "output_path": "./output",
+        "img_size": 256
+    }
+}
+
