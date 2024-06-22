@@ -1,4 +1,6 @@
-tensorflow==2.10
-opencv-contrib-python
 numpy
-pillow
+opencv_contrib_python
+Pillow
+pyzmq
+tensorflow
+tqdm
