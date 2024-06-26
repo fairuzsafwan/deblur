@@ -2,6 +2,7 @@ import cv2
 import numpy as np 
 import os
 from tqdm import tqdm
+
 import time
 
 def resizeImage(img, target_size):
@@ -41,6 +42,14 @@ def motionblur(imgPath, outputPath, image_size):
         
         # The greater the size, the more the motion. 
         kernel_size = 10
+
+def motionblur(imgPath, outputPath):
+    for path in tqdm(imgPath, "Progress"):
+        img = cv2.imread(path) 
+        
+        # Specify the kernel size. 
+        # The greater the size, the more the motion. 
+        kernel_size = 100
         
         # Create the vertical kernel. 
         #kernel_v = np.zeros((kernel_size, kernel_size)) 
@@ -64,6 +73,10 @@ def motionblur(imgPath, outputPath, image_size):
         
         # Apply the horizontal kernel. 
         horizonal_mb = cv2.filter2D(img, -1, kernel_h)
+
+        
+        # Apply the horizontal kernel. 
+        horizonal_mb = cv2.filter2D(img, -1, kernel_h) 
 
         outputPath_ = os.path.join(outputPath, os.path.basename(path))
         
@@ -92,3 +105,11 @@ if __name__ == "__main__":
     processGT(imgPaths, outputPath_gt, image_size)
 
     
+
+    if not os.path.exists(outputPath):
+        os.makedirs(outputPath)
+
+    imgPaths = [os.path.join(datasetPath, path) for path in os.listdir(datasetPath)]
+
+    motionblur(imgPaths, outputPath)
+

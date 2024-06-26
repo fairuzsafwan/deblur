@@ -162,6 +162,9 @@ def trainModel(num_epochs=10, learning_rate=0.001, train_loader=None, model_path
 
         #model.save_weights(model_path_name)
         model.save(os.path.join(model_path, str(epoch+1)))
+
+        #Clears sessions for memory leak issues
+        tf.keras.backend.clear_session()
     
     end_t = time.time() - start_t
     print(f"Time: {int(end_t // 60)} mins {int(end_t % 60)} secs")
@@ -184,7 +187,20 @@ def inference(model_path, img_path, output_path, resized_original_imgpath, img_s
     print("------------- Inference start -------------")
     # Load the trained model
     model = tf.keras.models.load_model(model_path)
+
     img_paths = [os.path.join(img_path, path) for path in os.listdir(img_path)]
+
+    dirName_path = os.path.dirname(model_path)
+    baseName_path = os.path.basename(model_path)
+    dirName_path = dirName_path + "_" + baseName_path
+    output_path = os.path.join(output_path, dirName_path)
+    img_paths = [os.path.join(img_path, path) for path in os.listdir(img_path)]
+
+    if not os.path.exists(output_path):
+            os.makedirs(output_path)
+        
+    if not os.path.exists(resized_original_imgpath):
+            os.makedirs(resized_original_imgpath)
 
     for img_path in img_paths:
         ori_img = read_inference_image(img_path, img_size=img_size, normalize=False)
@@ -199,6 +215,8 @@ def inference(model_path, img_path, output_path, resized_original_imgpath, img_s
         # Clip and convert image to uint8
         output_image = np.clip(output_image, 0, 255).astype(np.uint8)
         output_image = cv2.cvtColor(output_image, cv2.COLOR_RGB2BGR)
+
+        
         output_image_path = os.path.join(output_path, os.path.basename(img_path))
 
         resized_ori_imgPath = os.path.join(resized_original_imgpath, os.path.basename(img_path))
@@ -208,13 +226,18 @@ def inference(model_path, img_path, output_path, resized_original_imgpath, img_s
         
         if not os.path.exists(resized_original_imgpath):
             os.makedirs(resized_original_imgpath)
+        
+        
 
         cv2.imwrite(output_image_path, output_image)
         cv2.imwrite(resized_ori_imgPath, ori_img)
         print(f"Output image saved at {output_image_path}")
+        
     print("------------- Inference completed -------------")
 
 if __name__ == "__main__":
+    tf.keras.backend.clear_session()
+
     parser = argparse.ArgumentParser(description="Train deblurring model | Convert model to Tensorflow Lite")
     parser.add_argument("--train", "-t", action="store_true", help="train deblurring model")
     parser.add_argument("--infer", "-i", action="store_true", help="inference")
@@ -223,13 +246,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # parameters
-    num_epochs = 60
+    num_epochs = 200
     learning_rate = 0.001
     batch_size = 8 #32
     dataset_path = "blur_dataset"
     model_path = "saved_model"
     output_path = "result"
-    inference_path = "test_image" #6_HUAWEI-MATE20_M.JPG #7_NIKON-D3400-35MM_M #6_HUAWEI-MATE20_M.JPG #13_IPHONE-8-PLUS_M #6_HUAWEI-MATE20_M #13_IPHONE-8-PLUS_M
+    inference_path = "test_image"
     resized_original_imgpath = "resized_test_image"
     train_loader = None
     img_size = (256, 256) #(256, 256) #(512, 512) (224,224)

@@ -49,6 +49,9 @@ def trainModel(num_epochs=10, learning_rate=0.001, train_loader=None, model_path
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = mdl.UNet(n_channels=3, n_classes=3).to(device)
     #model = mdl.FPN(n_channels=3, n_classes=3).to(device)
+    #model = mdl.UNet(n_channels=3, n_classes=3).to(device)
+    model = mdl.FPN(n_channels=3, n_classes=3).to(device)
+
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     criterion = nn.MSELoss()
 
@@ -94,8 +97,12 @@ def inference(model_path, img_path, output_path, resized_original_imgpath, img_s
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = mdl.UNet(n_channels=3, n_classes=3).to(device)
+
     #model = mdl.FPN(n_channels=3, n_classes=3).to(device)
     model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
+
+    model = mdl.FPN(n_channels=3, n_classes=3).to(device)
+    model.load_state_dict(torch.load(model_path))
     model.eval()
 
     img_paths = [os.path.join(img_path, path) for path in os.listdir(img_path)]
