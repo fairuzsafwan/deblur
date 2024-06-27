@@ -153,11 +153,6 @@ if __name__ == "__main__":
     try:
         while True:
             try:
-                # Capture an image
-                frame = capture_image(camera)
-                if frame is None:
-                    continue
-                
                 # Receive message from ZeroMQ
                 message = subscriber.recv()
 
@@ -171,6 +166,10 @@ if __name__ == "__main__":
 
                 # Perform inference or other processing as needed based on lux_value
                 if lux_min <= lux_value <= lux_max:
+		    # Capture an image
+                    frame = capture_image(camera)
+                    if frame is None:
+                        continue
                     # Perform inference and save the result
                     inference(interpreter, frame, output_path, img_size, index)
                     index += 1
