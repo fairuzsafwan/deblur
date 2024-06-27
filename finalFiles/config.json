@@ -1,0 +1,18 @@
+{
+    "ZeroMQ": {
+        "ipc_address": "tcp://localhost:5555"
+    },
+    "LUX": {
+        "lux_min": 10,
+        "lux_max": 100000
+    },
+    "Model": {
+        "model_path": "model/model.tflite"
+    },
+    "Inference": {
+        "output_path": "output",
+        "img_size": [256, 256]
+    },
+    "capture_interval": 30
+}
+
