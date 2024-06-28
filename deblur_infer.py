@@ -6,7 +6,7 @@ import os
 import struct
 import tensorflow as tf
 import json
-import libcamera
+import subprocess
 
 # Define a class to deserialize data received via ZeroMQ
 class OBC_TlmData:
@@ -103,18 +103,14 @@ def inference(interpreter, img, output_path, img_size, index):
 
     print(f"Inference result {index} saved at {output_image_path}")
 
-# Function to capture an image using libcamera
-def capture_image(camera):
-    # Start the camera
-    camera.start()
-    
-    # Capture a frame
-    frame = camera.capture('frame')
-    
-    # Stop the camera
-    camera.stop()
+# Function to capture an image using libcamera-still
+def capture_image(image_path="capture.jpg"):
+    # Start the camera, capture an image and save it to 'image_path'
+    subprocess.run(["libcamera-still", "-o", image_path])
 
-    return frame
+    # Load the image
+    img = cv2.imread(image_path)
+    return img
 
 if __name__ == "__main__":
     # Load configuration from JSON file
@@ -145,10 +141,6 @@ if __name__ == "__main__":
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
 
-    # Initialize camera manager and camera
-    camera_manager = libcamera.CameraManager()
-    camera = camera_manager.get_camera(0)
-
     index = 0
     try:
         while True:
@@ -161,13 +153,13 @@ if __name__ == "__main__":
 
                 # Access the lux value
                 lux_value = obc_data.al_lux
-
+                
                 print(f"Value obtained: {lux_value}")
 
                 # Perform inference or other processing as needed based on lux_value
                 if lux_min <= lux_value <= lux_max:
-		    # Capture an image
-                    frame = capture_image(camera)
+                    # Capture an image
+                    frame = capture_image()
                     if frame is None:
                         continue
                     # Perform inference and save the result
