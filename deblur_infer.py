@@ -6,7 +6,6 @@ import os
 import struct
 import tensorflow as tf
 import json
-import subprocess
 
 # Define a class to deserialize data received via ZeroMQ
 class OBC_TlmData:
@@ -132,6 +131,7 @@ if __name__ == "__main__":
     output_path = config["Inference"]["output_path"]
     img_size = config["Inference"]["img_size"]
     capture_interval = config.get("capture_interval", 10)  # Default to 10 seconds if not specified
+    camera_port = config.get("camera_port", 0)
 
     # Set up ZeroMQ subscriber socket
     context = zmq.Context()
@@ -166,7 +166,7 @@ if __name__ == "__main__":
                 # Perform inference or other processing as needed based on lux_value
                 if lux_min <= lux_value <= lux_max:
                     # Capture an image
-                    frame = capture_image()
+                    frame = capture_image(camera_port)
                     if frame is None:
                         continue
                     # Perform inference and save the result
