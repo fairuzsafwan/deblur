@@ -6,8 +6,9 @@ import numpy as np
 from PIL import Image
 import time
 import argparse
-
+import matplotlib.pyplot as plt
 import model as mdl
+
 
 # Define a custom dataset class
 class CustomDataset(tf.keras.utils.Sequence):
@@ -16,8 +17,8 @@ class CustomDataset(tf.keras.utils.Sequence):
         self.batch_size = batch_size
         self.input_shape = input_shape
         self.shuffle = shuffle
-        self.image_gt = os.listdir(os.path.join(image_path_folder, "sharp"))
-        self.image_train = os.listdir(os.path.join(image_path_folder, "motion_blurred_v2"))
+        self.image_gt = os.listdir(os.path.join(image_path_folder, "sharp_v3"))
+        self.image_train = os.listdir(os.path.join(image_path_folder, "motion_blurred_v3"))
 
     def __len__(self):
         return int(np.ceil(len(self.image_train) / float(self.batch_size)))
@@ -30,8 +31,8 @@ class CustomDataset(tf.keras.utils.Sequence):
         gt_images = []
 
         for img_train, img_gt in zip(batch_image_train, batch_image_gt):
-            train_image_path = os.path.join(self.image_root_path, "motion_blurred_v2", img_train)
-            gt_image_path = os.path.join(self.image_root_path, "sharp", img_gt)
+            train_image_path = os.path.join(self.image_root_path, "motion_blurred_v3", img_train)
+            gt_image_path = os.path.join(self.image_root_path, "sharp_v3", img_gt)
 
             train_image = read_image(train_image_path, img_size=self.input_shape)
             gt_image = read_image(gt_image_path, img_size=self.input_shape)
@@ -45,86 +46,44 @@ class CustomDataset(tf.keras.utils.Sequence):
 
         return np.array(train_images), np.array(gt_images)
 
-class DoubleConv(tf.keras.Model):
-    def __init__(self, in_channels, out_channels):
-        super(DoubleConv, self).__init__()
-        self.double_conv = tf.keras.Sequential([
-            layers.Conv2D(out_channels, kernel_size=3, padding='same'),
-            layers.ReLU(),
-            layers.Conv2D(out_channels, kernel_size=3, padding='same'),
-            layers.ReLU()
-        ])
+def resizeImage(img, target_size):
+    h, w = img.shape[:2]
+    aspect_ratio = w/h
 
-    def call(self, x):
-        return self.double_conv(x)
+    if w > h:
+        new_w = int(target_size * aspect_ratio)
+        new_h = target_size
+    else:
+        new_h = int(target_size / aspect_ratio)
+        new_w = target_size
+    
+    resized_image = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
-class Down(tf.keras.Model):
-    def __init__(self, in_channels, out_channels):
-        super(Down, self).__init__()
-        self.maxpool_conv = tf.keras.Sequential([
-            layers.MaxPooling2D(pool_size=(2, 2)),
-            DoubleConv(in_channels, out_channels)
-        ])
+    #crop image to target_size
+    half_cropSize = int(target_size/2)
 
-    def call(self, x):
-        return self.maxpool_conv(x)
+    h_, w_ = resized_image.shape[:2]
+    coor_h_ = int(h_ / 2)
+    coor_w_ = int(w_ / 2)
 
-class Up(tf.keras.Model):
-    def __init__(self, in_channels, out_channels, bilinear=True):
-        super(Up, self).__init__()
-        self.bilinear = bilinear
-        if not bilinear:
-            self.up = layers.Conv2DTranspose(in_channels // 2, kernel_size=2, strides=2, padding='same')
-        self.conv = DoubleConv(in_channels, out_channels)
+    resized_image = resized_image[coor_h_-half_cropSize:coor_h_+half_cropSize, coor_w_-half_cropSize:coor_w_+half_cropSize]
 
-    def call(self, x1, x2):
-        if self.bilinear:
-            x1 = layers.UpSampling2D(size=(2, 2), interpolation='bilinear')(x1)
-        else:
-            x1 = self.up(x1)
-        diffY = x2.shape[1] - x1.shape[1]
-        diffX = x2.shape[2] - x1.shape[2]
-        x1 = layers.ZeroPadding2D(padding=((diffX // 2, diffX - diffX // 2), (diffY // 2, diffY - diffY // 2)))(x1)
-        x = tf.concat([x2, x1], axis=-1)
-        return self.conv(x)
+    return resized_image
 
-class UNet(tf.keras.Model):
-    def __init__(self, n_channels, n_classes):
-        super(UNet, self).__init__()
-        self.inc = DoubleConv(n_channels, 64)
-        self.down1 = Down(64, 128)
-        self.down2 = Down(128, 256)
-        self.down3 = Down(256, 512)
-        self.down4 = Down(512, 512)
-        self.up1 = Up(1024, 256)
-        self.up2 = Up(512, 128)
-        self.up3 = Up(256, 64)
-        self.up4 = Up(128, 64)
-        self.outc = layers.Conv2D(n_classes, kernel_size=1)
-
-    def call(self, x):
-        x1 = self.inc(x)
-        x2 = self.down1(x1)
-        x3 = self.down2(x2)
-        x4 = self.down3(x3)
-        x5 = self.down4(x4)
-        x = self.up1(x5, x4)
-        x = self.up2(x, x3)
-        x = self.up3(x, x2)
-        x = self.up4(x, x1)
-        results = self.outc(x)
-        return results
-
-def read_image(image_path, img_size=(512, 512)):
+def read_image(image_path, img_size=(256, 256)):
     img = cv2.imread(image_path, cv2.IMREAD_COLOR)
-    img = cv2.resize(img, img_size)  # Resize images to a fixed size
+    #img = cv2.resize(img, img_size)  # Resize images to a fixed size
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
     img = img / 255.0  # Normalize the images
     return img
 
-def read_inference_image(image_path, img_size=(512, 512), normalize = False):
+def read_inference_image(image_path, img_size=(256, 256), normalize = False):
     img = cv2.imread(image_path, cv2.IMREAD_COLOR)
-    img = cv2.resize(img, img_size)  # Resize images to match training input size
+    h, w = img.shape[:2]
+    
+    if h != img_size[0] or w != img_size[1]:
+        img = resizeImage(img, img_size[0])  # Resize images to match training input size
+    
     if normalize:
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
         img = img.astype(np.float32) / 255.0  # Normalize the images
@@ -136,8 +95,13 @@ def processDataset(dataset_path, batch_size, input_shape):
 
 def trainModel(num_epochs=10, learning_rate=0.001, train_loader=None, model_path="./"):
     print("------------- Training Start -------------")
-    model = UNet(n_channels=3, n_classes=3)
+    best_loss = 10000
+    best_epoch = 0
+    loss_ls = []
+
+    model = mdl.UNet(n_channels=3, n_classes=3)
     # model = mdl.FPN(n_channels=3, n_classes=3)
+    # model = mdl.ResNetUNet(n_channels=3, n_classes=3)
     optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
     criterion = tf.keras.losses.MeanSquaredError()
 
@@ -158,6 +122,12 @@ def trainModel(num_epochs=10, learning_rate=0.001, train_loader=None, model_path
             loss = train_step(batch_images, batch_gt_images)
             total_loss += loss
 
+        loss_ls.append(total_loss)
+
+        if total_loss < best_loss:
+            best_loss = total_loss
+            best_epoch = epoch+1
+
         print(f'Epoch [{epoch + 1}/{num_epochs}], Loss: {total_loss}')
 
         #model.save_weights(model_path_name)
@@ -166,7 +136,19 @@ def trainModel(num_epochs=10, learning_rate=0.001, train_loader=None, model_path
         #Clears sessions for memory leak issues
         tf.keras.backend.clear_session()
     
+    #Plot graph
+    xs = [x for x in range(len(loss_ls))]
+    plt.plot(xs, loss_ls)
+    plt.savefig(os.path.join(model_path, "loss.png"))
+    plt.close()
+
+    f = open(os.path.join(model_path, "best_epoch.txt"), "w")
+    f.write(f"Best Epoch: {best_epoch}\n")
+    f.write(f"Best Loss: {best_loss}\n")
+    f.close()
+
     end_t = time.time() - start_t
+    print(f"Best Model: Epoch {best_epoch} | loss: {best_loss}")
     print(f"Time: {int(end_t // 60)} mins {int(end_t % 60)} secs")
 
     print("------------- Training completed -------------")
@@ -248,7 +230,7 @@ if __name__ == "__main__":
     # parameters
     num_epochs = 200
     learning_rate = 0.001
-    batch_size = 8 #32
+    batch_size = 18 #32
     dataset_path = "blur_dataset"
     model_path = "saved_model"
     output_path = "result"

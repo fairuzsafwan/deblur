@@ -4,6 +4,7 @@ import os
 from tqdm import tqdm
 
 import time
+import random
 
 def resizeImage(img, target_size):
     h, w = img.shape[:2]
@@ -32,24 +33,23 @@ def resizeImage(img, target_size):
 def processGT(imgPath, outputPath_gt, image_size):
     for path in tqdm(imgPath, "GT Progress"):
         img = cv2.imread(path)
-        img = resizeImage(img, image_size)
+        h, w = img.shape[:2]
+
+        if (h < image_size) or (w < image_size):
+            continue
+
+        if (h > image_size) and (w > image_size):
+            img = resizeImage(img, image_size)
+
         outputPath_ = os.path.join(outputPath_gt, os.path.basename(path))
         cv2.imwrite(outputPath_, img)
 
 def motionblur(imgPath, outputPath, image_size):
     for path in tqdm(imgPath, "Train Progress"):
         img = cv2.imread(path) 
-        
-        # The greater the size, the more the motion. 
-        kernel_size = 10
 
-def motionblur(imgPath, outputPath):
-    for path in tqdm(imgPath, "Progress"):
-        img = cv2.imread(path) 
-        
-        # Specify the kernel size. 
         # The greater the size, the more the motion. 
-        kernel_size = 100
+        kernel_size = random.randint(10, 20) #10
         
         # Create the vertical kernel. 
         #kernel_v = np.zeros((kernel_size, kernel_size)) 
@@ -68,8 +68,14 @@ def motionblur(imgPath, outputPath):
         # Apply the vertical kernel. 
         #vertical_mb = cv2.filter2D(img, -1, kernel_v)
 
-        #resize image
-        img = resizeImage(img, image_size)
+        h, w = img.shape[:2]
+
+        if (h < image_size) or (w < image_size):
+            continue
+
+        if (h > image_size) and (w > image_size):
+            #resize image
+            img = resizeImage(img, image_size)
         
         # Apply the horizontal kernel. 
         horizonal_mb = cv2.filter2D(img, -1, kernel_h)
@@ -85,9 +91,9 @@ def motionblur(imgPath, outputPath):
         cv2.imwrite(outputPath_, horizonal_mb)
 
 if __name__ == "__main__":
-    datasetPath = "blur_dataset/sharp"
-    outputPath = "blur_dataset/motion_blurred_v2"
-    outputPath_gt = "blur_dataset/sharp_v2"
+    datasetPath = "blur_dataset/sharp3.0"
+    outputPath = "blur_dataset/motion_blurred_v3"
+    outputPath_gt = "blur_dataset/sharp_v3"
     image_size = 256
 
     if not os.path.exists(outputPath):
@@ -104,12 +110,4 @@ if __name__ == "__main__":
     #process gt dataset
     processGT(imgPaths, outputPath_gt, image_size)
 
-    
-
-    if not os.path.exists(outputPath):
-        os.makedirs(outputPath)
-
-    imgPaths = [os.path.join(datasetPath, path) for path in os.listdir(datasetPath)]
-
-    motionblur(imgPaths, outputPath)
 
