@@ -103,14 +103,21 @@ def inference(interpreter, img, output_path, img_size, index):
 
     print(f"Inference result {index} saved at {output_image_path}")
 
-# Function to capture an image using libcamera-still
-def capture_image(image_path="capture.jpg"):
-    # Start the camera, capture an image and save it to 'image_path'
-    subprocess.run(["libcamera-still", "-o", image_path])
+# Function to capture an image using OpenCV
+def capture_image(camera_index=0):
+    cap = cv2.VideoCapture(camera_index)
+    if not cap.isOpened():
+        print(f"Error: Unable to open camera {camera_index}")
+        return None
 
-    # Load the image
-    img = cv2.imread(image_path)
-    return img
+    ret, frame = cap.read()
+    cap.release()
+
+    if not ret:
+        print("Error: Failed to capture image")
+        return None
+
+    return frame
 
 if __name__ == "__main__":
     # Load configuration from JSON file

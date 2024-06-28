@@ -13,6 +13,7 @@
         "output_path": "output",
         "img_size": [256, 256]
     },
-    "capture_interval": 30
+    "capture_interval": 30,
+    "camera_port": 0
 }
 
