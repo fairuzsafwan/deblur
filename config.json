@@ -7,7 +7,7 @@
         "lux_max": 500000
     },
     "Model": {
-        "model_path": "256_e200_unet_b18_tf/200/200.tflite"
+        "model_path": "saved_model/model.tflite"
     },
     "Inference": {
         "output_path": "output",

@@ -115,60 +115,48 @@ class UNet(tf.keras.Model):
         results = self.outc(x)
         return results
 
-def read_image(image_path, img_size=(512, 512)):
+def resizeImage(img, target_size):
+    h, w = img.shape[:2]
+    aspect_ratio = w/h
+
+    if w > h:
+        new_w = int(target_size * aspect_ratio)
+        new_h = target_size
+    else:
+        new_h = int(target_size / aspect_ratio)
+        new_w = target_size
+    
+    resized_image = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
+    #crop image to target_size
+    half_cropSize = int(target_size/2)
+
+    h_, w_ = resized_image.shape[:2]
+    coor_h_ = int(h_ / 2)
+    coor_w_ = int(w_ / 2)
+
+    resized_image = resized_image[coor_h_-half_cropSize:coor_h_+half_cropSize, coor_w_-half_cropSize:coor_w_+half_cropSize]
+
+    return resized_image
+
+def read_image(image_path, img_size=(256, 256)):
     img = cv2.imread(image_path, cv2.IMREAD_COLOR)
-    img = cv2.resize(img, img_size)  # Resize images to a fixed size
+    #img = cv2.resize(img, img_size)  # Resize images to a fixed size
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
     img = img / 255.0  # Normalize the images
     return img
 
-# def read_inference_image(image_path, img_size=(256, 256), normalize=False):
-#     try:
-#         img = cv2.imread(image_path, cv2.IMREAD_COLOR)
-#         if img is None:
-#             raise ValueError(f"Error: Failed to load image at {image_path}")
-
-#         # Calculate aspect ratio
-#         h, w, _ = img.shape
-#         target_h, target_w = img_size
-
-#         if h > w:
-#             # Crop height
-#             start_h = (h - w) // 2
-#             img = img[start_h:start_h + w, :, :]
-#         else:
-#             # Crop width
-#             start_w = (w - h) // 2
-#             img = img[:, start_w:start_w + h, :]
-
-#         # Resize to target size
-#         img = cv2.resize(img, (target_w, target_h))
-
-#         if normalize:
-#             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
-#             img = img.astype(np.float32) / 255.0  # Normalize the images
-
-#         return img
-#     except Exception as e:
-#         print(f"Exception in reading image {image_path}: {e}")
-#         return None
-
-def read_inference_image(image_path, img_size=(512, 512), normalize=False):
-    try:
-        img = cv2.imread(image_path, cv2.IMREAD_COLOR)
-        if img is None:
-            raise ValueError(f"Error: Failed to load image at {image_path}")
-        
-        img = cv2.resize(img, img_size)  # Resize images to match training input size
-        
-        if normalize:
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
-            img = img.astype(np.float32) / 255.0  # Normalize the images
-
-        return img
-    except Exception as e:
-        print(f"Exception in reading image {image_path}: {e}")
-        return None
+def read_inference_image(image_path, img_size=(256, 256), normalize = False):
+    img = cv2.imread(image_path, cv2.IMREAD_COLOR)
+    h, w = img.shape[:2]
+    
+    if h != img_size[0] or w != img_size[1]:
+        img = resizeImage(img, img_size[0])  # Resize images to match training input size
+    
+    if normalize:
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
+        img = img.astype(np.float32) / 255.0  # Normalize the images
+    return img
 
 def processDataset(dataset_path, batch_size, input_shape):
     train_dataset = CustomDataset(image_path_folder=dataset_path, batch_size=batch_size, input_shape=input_shape)
@@ -228,7 +216,7 @@ def inference(model_path, img_path, output_path, resized_original_imgpath, img_s
 
     try:
         # Initialize TensorFlow Lite interpreter
-        interpreter = tf.lite.Interpreter(model_path=os.path.join(model_path, "200.tflite"))
+        interpreter = tf.lite.Interpreter(model_path=os.path.join(model_path, "unet3.tflite"))
         interpreter.allocate_tensors()
 
         # Get input and output details
@@ -296,8 +284,8 @@ if __name__ == "__main__":
     learning_rate = 0.001
     batch_size = 18 #32
     dataset_path = "blur_dataset"
-    model_path = "256_e200_unet_b18_tf/200"
-    output_path = "result_tflite"
+    model_path = "saved_model"
+    output_path = "result_tflite_unet3_2"
     inference_path = "test_image"
     resized_original_imgpath = "resized_test_image"
     train_loader = None

@@ -6,7 +6,6 @@ import os
 import struct
 import tensorflow as tf
 import json
-import libcamera
 
 # Define a class to deserialize data received via ZeroMQ
 class OBC_TlmData:
@@ -103,16 +102,19 @@ def inference(interpreter, img, output_path, img_size, index):
 
     print(f"Inference result {index} saved at {output_image_path}")
 
-# Function to capture an image using libcamera
-def capture_image(camera):
-    # Start the camera
-    camera.start()
-    
-    # Capture a frame
-    frame = camera.capture('frame')
-    
-    # Stop the camera
-    camera.stop()
+# Function to capture an image using OpenCV
+def capture_image(camera_index=0):
+    cap = cv2.VideoCapture(camera_index)
+    if not cap.isOpened():
+        print(f"Error: Unable to open camera {camera_index}")
+        return None
+
+    ret, frame = cap.read()
+    cap.release()
+
+    if not ret:
+        print("Error: Failed to capture image")
+        return None
 
     return frame
 
@@ -129,6 +131,7 @@ if __name__ == "__main__":
     output_path = config["Inference"]["output_path"]
     img_size = config["Inference"]["img_size"]
     capture_interval = config.get("capture_interval", 10)  # Default to 10 seconds if not specified
+    camera_port = config.get("camera_port", 0)
 
     # Set up ZeroMQ subscriber socket
     context = zmq.Context()
@@ -145,10 +148,6 @@ if __name__ == "__main__":
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
 
-    # Initialize camera manager and camera
-    camera_manager = libcamera.CameraManager()
-    camera = camera_manager.get_camera(0)
-
     index = 0
     try:
         while True:
@@ -161,13 +160,13 @@ if __name__ == "__main__":
 
                 # Access the lux value
                 lux_value = obc_data.al_lux
-
+                
                 print(f"Value obtained: {lux_value}")
 
                 # Perform inference or other processing as needed based on lux_value
                 if lux_min <= lux_value <= lux_max:
-		    # Capture an image
-                    frame = capture_image(camera)
+                    # Capture an image
+                    frame = capture_image(camera_port)
                     if frame is None:
                         continue
                     # Perform inference and save the result
