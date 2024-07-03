@@ -5,5 +5,5 @@
     "Data": {
         "output_path": "output"
     },
-    "capture_interval": 30
+    "capture_interval": 5
 }
