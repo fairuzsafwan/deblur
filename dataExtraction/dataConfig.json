@@ -1,0 +1,9 @@
+{
+    "ZeroMQ": {
+        "ipc_address": "ipc:///tmp/obc_ss"
+    },
+    "Data": {
+        "output_path": "output"
+    },
+    "capture_interval": 30
+}
